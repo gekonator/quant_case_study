@@ -1,4 +1,4 @@
-# Report: Day Short Strategy on Upbit Pumps (korean_pump)
+# Report: Daily short strategy on Upbit pumps
 
 Date: 2026-07-02. All times UTC. Data: own frozen 1m dataset
 (Upbit spot + Binance USDT-M perp + funding), 2025-01-01 → 2026-06-01,
@@ -21,7 +21,7 @@ Short a pump on the Binance perp after anomalous volume/growth is detected on Up
 | Stop-loss | 13% from entry price |
 | Take-profit | limit, 90%-capture of the move (entry − implied ref) |
 | Time-exit | D+1 14:00 UTC |
-| Kimchi filter | **none** (H2 rejected, see §4) |
+| Kimchi filter | **none** (H2 not supported, see §2) |
 | Position cap | none; one open position per token at a time |
 | Sizing | flat 1,000 USDT notional per trade, no compounding |
 | Cost model | fee 0.04%/side; funding (entry, exit] × mark price; slippage 0.05% on market fills |
@@ -30,25 +30,27 @@ Short a pump on the Binance perp after anomalous volume/growth is detected on Up
 ## 2. Validation protocol and results
 
 
-1. **Grid search strictly on IS 2026-01→2026-06** (1,600 configurations),
+1. **Grid search strictly on the 2026-01→2026-06 calibration sample**
+   (1,600 configurations),
    selection metric — lower bound of the bootstrap CI of expectancy; the
    winner was chosen by plateau, not peak (ci_low 15.63, neighbors ≥13.7).
    2025 was not used in the selection.
-2. **OOS 2025 (full year), single run, criteria pre-registered before the run:**
-   CI_low > 0 and expectancy ≥ 50% of IS. **PASS**: expectancy +16.42 vs
+2. **Historical holdout 2025 (full year), single evaluation with criteria
+   pre-specified before the run:**
+   CI_low > 0 and expectancy ≥ 50% of calibration. **PASS**: expectancy +16.42 vs
    threshold +13.39; CI [+5.2, +27.8]. (The night-strategy candidate failed
-   the criterion as expected and was discarded — the protocol filtered out noise.)
-3. **H2 (kimchi specificity): FAIL** — the paired contrast of the kimchi gate
-   on OOS is not significant (+1.51, CI [−2.19, +5.07]); moreover, trades with
-   a falling kimchi premium were profitable. Conclusion: the edge is generic
-   pump-reversal; no kimchi filter is included in the configuration.
+   to meet the criterion and was discarded.)
+3. **H2 (kimchi specificity): NOT SUPPORTED** — the paired contrast of the kimchi gate
+   on the holdout is not significant (+1.51, CI [−2.19, +5.07]); moreover, trades with
+   a falling kimchi premium were profitable. The evidence is more consistent
+   with generic pump-reversal; no kimchi filter is included in the configuration.
 4. **Shuffle robustness**: the cap almost never binds (7 of 110 days with >3
-   entries); dropping the cap is methodologically confirmed.
+   entries), and cap-dependent results are sensitive to within-day ordering.
 
 
 ## 3. Metrics (base 10,000 USDT, realized-only equity)
 
-| | IS 2026 (151 d) | **OOS 2025 (365 d)** |
+| | Calibration 2026 (151 d) | **Historical holdout 2025 (365 d)** |
 |---|---|---|
 | Trades | 181 | 171 |
 | Expectancy | +26.79 USDT (2.68%) | **+16.42 USDT (1.64%)** |
@@ -62,11 +64,12 @@ Short a pump on the Binance perp after anomalous volume/growth is detected on Up
 
 ![Equity](results/fig_equity.png)
 
-The honest forward-looking expectation is the OOS row (~28% annualized on 10k),
-not IS: signal density is non-stationary (2026 produced 181 trades in 5 months
-vs 171 for all of 2025).
+The historical holdout row is the more conservative of the two estimates, but it
+is not a forward-looking guarantee: signal density is non-stationary (2026
+produced 181 trades in 5 months vs 171 for all of 2025), and true forward
+validation remains pending.
 
-## 4. Monte Carlo (10,000 bootstrap paths, OOS trades)
+## 4. Monte Carlo (10,000 bootstrap paths, historical holdout trades)
 
 | | p5 | p50 | p95 |
 |---|---|---|---|
@@ -87,9 +90,9 @@ market executions are stressed: entry, time-exit, and the **stop fill**
 (the key negative tail — a stop firing while the pump keeps running on
 an illiquid alt).
 
-**Main result: the edge survives on OOS across the entire realistic zone.**
+**Main result: held-out expectancy remains positive across the realistic zone.**
 
-| Scenario (entry/exit, stop) | OOS expectancy | OOS CI_low | Verdict |
+| Scenario (entry/exit, stop) | Holdout expectancy | Holdout CI_low | Verdict |
 |---|---|---|---|
 | Baseline (0.05/0.05, 0.05) | +16.34 | +4.59 | ✅ |
 | Optimistic-realistic (0.1/0.1, 0.3) | +15.41 | +4.18 | ✅ |
@@ -97,16 +100,16 @@ an illiquid alt).
 | Pessimistic-realistic (0.2/0.2, 0.75) | +13.42 | +1.68 | ✅ |
 | Extreme corner (0.3/0.3, 1.0) | +11.93 | **−0.40** | ❌ |
 
-Per-component survival thresholds (OOS, others held at 0.05%): neither
+Per-component survival thresholds (holdout, others held at 0.05%): neither
 s_stop up to 1.0%, nor s_entry up to 0.3%, nor s_exit up to 0.3% pushes
 CI_low below zero on its own. The only failing point of the whole grid is
 all three components at their extremes simultaneously. Why the edge is
 robust to stop slippage: SL is only 13% of trades, and a 1% slip on the
 stop moves expectancy by only ~−1.4 USDT/trade.
 
-**Answer to the key question: yes, the strategy survives realistic slippage
-levels for post-pump alts (entry/exit 0.1–0.2%, stop 0.3–0.75%) with margin;
-no red flag.** The margin is not infinite, however: at the
+**Answer to the key question: historical holdout expectancy remains positive
+under realistic slippage assumptions for post-pump alts (entry/exit 0.1–0.2%,
+stop 0.3–0.75%).** The margin is not infinite: at the
 pessimistic-realistic point CI_low is only +1.68 — monitoring actual
 slippage in live trading is mandatory.
 
@@ -119,13 +122,14 @@ slippage in live trading is mandatory.
 - **Realized-only equity**: floating drawdown of open positions
   (theoretically up to ~13% × positions) is invisible in MDD; a margin call
   is unreachable at ≤0.7x leverage.
-- **vp≥40 is the edge of the IS grid**; higher values were not explored.
+- **vp≥40 is the edge of the calibration grid**; higher values were not explored.
 - **Regime non-stationarity**: signal density and pump profiles change year
-  to year; MC and OOS partially reflect this but do not guarantee it.
+  to year; the Monte Carlo analysis and historical holdout only partially
+  reflect this risk.
 - Delisting risk of the shorted alt and Upbit/Binance rule changes are
   outside the model.
-- 2025 has been used twice (H1 OOS + exploratory) — any new configuration
-  changes require a fresh OOS (2026-H2+).
+- 2025 has been used twice (H1 holdout + exploratory) — any new configuration
+  changes require a fresh forward sample (2026-H2+).
 
 ## 7. Files
 

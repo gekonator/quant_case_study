@@ -1,16 +1,16 @@
-# Validation of an Upbit-pump short strategy
+# Crypto post-pump mean-reversion backtest
 
-An out-of-sample backtest of the thesis that **Korea-driven altcoin pumps on
-Upbit mean-revert**, and can be shorted profitably after the move.
+A held-out historical backtest of the thesis that **altcoin pumps detected on
+Upbit tend to mean-revert**, and may be shortable after the initial move.
 
 The project is deliberately structured as a *falsification exercise*, not a
-performance showcase: every claim is a pre-registered, testable hypothesis with
-a stated null, an in-sample / out-of-sample split, and a pass/fail criterion
-fixed **before** the out-of-sample data is touched.
+performance showcase: each claim is a testable hypothesis with a stated null,
+a calibration / held-out split, and a pass/fail criterion fixed **before** the
+held-out data is evaluated. The dated Git history preserves that sequence.
 
 ---
 
-## Theorem
+## Research thesis
 
 A sharp, Korea-driven upward move in an altcoin on Upbit is, on average,
 **partially reverted** over the following hours or days — enough that a short
@@ -38,16 +38,16 @@ Shorting a qualifying pump (see *Signals*) yields **positive net-of-costs
 expectancy** on data not used to calibrate the filter thresholds.
 
 - **H0:** expectancy ≤ 0.
-- **Test:** chronological IS/OOS split. Thresholds and trade geometry are
-  selected only on IS; expectancy — with a bootstrap confidence interval — is
-  measured only once on OOS.
-- **Pass criterion (pre-registered):** OOS bootstrap CI lower bound > 0 **and**
-  OOS expectancy ≥ 50 % of the IS expectancy.
+- **Test:** temporal held-out split. Thresholds and trade geometry are selected
+  only on the 2026 calibration sample; expectancy — with a bootstrap confidence
+  interval — is measured once on the untouched 2025 historical holdout.
+- **Pass criterion (pre-specified):** held-out bootstrap CI lower bound > 0
+  **and** held-out expectancy ≥ 50 % of calibration expectancy.
 
 ### H2 — The edge is Korea-specific
 
 Among candidates that pass H1's filters, expectancy is **conditional on the
-kimchi-premium state** in a pre-registered direction — higher when the premium
+kimchi-premium state** in a pre-specified direction — higher when the premium
 behaves as the mechanism predicts than when it is flat or blind to it.
 
 - **H0:** expectancy(kimchi-conditioned) = expectancy(kimchi-blind) — i.e. the
@@ -56,8 +56,9 @@ behaves as the mechanism predicts than when it is flat or blind to it.
   H1-calibrated values; only the kimchi filter is toggled on/off on the *same*
   candidate pool, so the comparison isolates the premium from confounding
   parameter combinations.
-- **Constraint:** the kimchi range itself is fixed on IS and confirmed on OOS —
-  never grid-searched and reported on the same sample. Folding kimchi into the
+- **Constraint:** the kimchi range itself is fixed on the calibration sample and
+  evaluated on the holdout — never grid-searched and reported on the same
+  sample. Folding kimchi into the
   main grid would *not* test H2: the optimizer could silently discard it, and we
   would learn nothing about attribution.
 
@@ -114,8 +115,10 @@ timeline. Reserved exclusively for the H2 paired contrast.
 - **Data:** frozen 1-minute Parquet datasets (Binance USDT-M perps + funding,
   Upbit KRW markets, Upbit KRW-USDT), fetched once. No live API calls during
   backtesting.
-- **IS/OOS:** chronological split. IS = 2026-01-01 → 2026-06-01; OOS =
-  2025-01-01 → 2026-01-01. OOS untouched until a single final run per config.
+- **Calibration / holdout:** calibration = 2026-01-01 → 2026-06-01;
+  historical holdout = 2025-01-01 → 2026-01-01. The holdout predates the
+  calibration period, so this is not forward validation; it remained untouched
+  until a single final evaluation per configuration.
 - **No hardcoded parameters:** filter thresholds and trade geometry are
   grid-searched on IS only.
 - **Point-in-time execution:** fills on the next bar; no look-ahead. Universe
@@ -129,10 +132,9 @@ timeline. Reserved exclusively for the H2 paired contrast.
 - **Position-cap handling:** a maximum-concurrent-positions cap is deliberately
   **excluded** from the grid. A cap selects trades by their order within a day,
   not by signal quality, which biases the sample and confounds the edge test. A
-  shuffle test (re-ordering same-day trades) confirmed that any cap-dependent
-  result would be an artifact of historical sequence, not a property of the
-  edge. A cap belongs to risk management, applied afterward — not to the
-  hypothesis test.
+  shuffle test (re-ordering same-day trades) showed that cap-dependent results
+  were sensitive to historical sequence rather than signal quality. A cap
+  belongs to risk management, applied afterward — not to the hypothesis test.
 
 **Cost model:** taker fee 0.04 %/side, real funding over the holding period
 (`(entry, exit]`, scaled by mark price), slippage 0.05 % on entry and forced
@@ -154,7 +156,7 @@ Entry at the Korean session open, held to the next day's session close.
 Selected config: `volume_points ≥ 40, growth_points ≥ 15, pump_points ≥ 5,
 SL 13 %, TP 90 %-capture`.
 
-| Metric | In-sample (2026) | Out-of-sample (2025) |
+| Metric | Calibration (2026) | Historical holdout (2025) |
 |---|---|---|
 | Trades | 181 | 171 |
 | Expectancy / trade | +26.79 USDT (+2.68 %) | +16.42 USDT (+1.64 %) |
@@ -163,55 +165,54 @@ SL 13 %, TP 90 %-capture`.
 | Profit factor | 2.36 | 1.72 |
 | Max drawdown (realized) | 3.0 % | 5.6 % |
 
-Both pre-registered criteria met on OOS: CI lower bound +5.20 > 0, and OOS
-expectancy (+16.42) exceeds 50 % of IS expectancy (+13.39 threshold). The IS→OOS
-decay of −39 % is a normal magnitude; the edge remained statistically
-significant with margin.
+Both pre-specified criteria were met in the historical holdout: CI lower bound
++5.20 > 0, and held-out expectancy (+16.42) exceeded 50 % of calibration
+expectancy (+13.39 threshold). Expectancy was 39 % lower than in calibration but
+remained positive with a confidence interval above zero.
 
 #### Night short — **FAIL**
 
 Entry in a short post-midnight-UTC window, closed same session. Selected config:
 `volume_points ≥ 5, growth_points ≥ 3, SL 8 %, TP 90 %-capture`.
 
-| Metric | In-sample (2026) | Out-of-sample (2025) |
+| Metric | Calibration (2026) | Historical holdout (2025) |
 |---|---|---|
 | Trades | 704 | 992 |
 | Expectancy / trade | +3.47 USDT (+0.35 %) | +2.19 USDT |
 | Bootstrap CI (95 %) lower | +0.58 | **−0.27** |
 
-The night edge was flagged as weak already on IS — no configuration in the top
+The night signal was flagged as weak in calibration — no configuration in the top
 20 formed a plateau (every neighbour dropped the CI lower bound below zero). On
-OOS the expectancy stayed mildly positive but the bootstrap CI **crossed zero**:
+the holdout, expectancy stayed mildly positive but the bootstrap CI **crossed zero**:
 the edge is statistically indistinguishable from noise. Per protocol, this
 configuration is archived, not carried forward.
 
 ### Interpretation
 
-The split outcome **confirms the protocol works**, rather than indicating a flaw
-in it. A signal that never formed a plateau on IS and sat on the edge of
-significance failed OOS exactly as predicted — it did not "break into the
-negative", it simply revealed itself to be what it looked like: noise with a
-slight positive drift, insufficient to trade. A weak signal being caught and
-discarded by a pre-registered filter is the filter doing its job.
+The split outcome is consistent with the protocol discriminating between a
+stronger and a weaker candidate. The night signal never formed a plateau in
+calibration and remained statistically indistinguishable from zero in the
+holdout, so it was discarded rather than promoted as a tradable result.
 
 **Honest caveats on the daily PASS:**
 
-- OOS CAGR (~40 %) is far below IS CAGR (~318 %). This is not only expectancy
+- Held-out CAGR (~40 %) is far below calibration CAGR (~318 %). This is not only expectancy
   decay: 2026 was unusually rich in qualifying events (181 trades in 5 months vs
   171 in 12 months). **Signal density is non-stationary.**
 - `volume_points ≥ 40` sits at the **edge of the grid** — the true optimum may
   lie beyond it and was not probed. This is a candidate for a follow-up IS grid
-  extension, not something the current OOS validated.
+  extension, not something the current holdout validated.
 
-**Status: H1 confirmed for the daily configuration; rejected for the night
-configuration.** H2 was then tested on the daily configuration (below).
+**Status: H1 supported on the historical holdout for the daily configuration;
+not supported for the night configuration.** H2 was then tested on the daily
+configuration (below).
 
-### H2 — Korea-specificity — **REJECTED**
+### H2 — Korea-specificity — **NOT SUPPORTED**
 
 With the daily H1 configuration frozen, the kimchi premium was tested for
 attribution. The Δkimchi band was calibrated on IS **by the shape** of the
 expectancy–vs–premium relationship (where expectancy crosses zero), not by
-maximizing PnL, and then frozen for a single OOS paired contrast.
+maximizing PnL, and then frozen for a single held-out paired contrast.
 
 **IS shape (2026)** — expectancy by Δkimchi bin, bins fixed before inspecting
 PnL:
@@ -234,7 +235,7 @@ the **Δkimchi < 0 bin is solidly positive** (trades profit even when the premiu
 *fell* into entry), and the extreme tail (≥ 3) stays positive. The shape-derived
 band came out as `(−∞, 2.5)` — it only excludes the single failing bin.
 
-**OOS paired contrast (2025), one run:**
+**Historical holdout paired contrast (2025), one run:**
 
 | | Blind | Conditioned |
 |---|---|---|
@@ -244,7 +245,7 @@ band came out as `(−∞, 2.5)` — it only excludes the single failing bin.
 | Win rate / PF | 71.9 % / 1.72 | 74.4 % / 1.81 |
 
 Difference (conditioned − blind): **+1.51 USDT/trade, paired 95 % CI
-[−2.19, +5.07].** Pre-registered criterion required the CI lower bound > 0 — it
+[−2.19, +5.07].** The pre-specified criterion required the CI lower bound > 0 — it
 is not. **H0 not rejected.**
 
 **Interpretation.** The kimchi gate produces no statistically distinguishable
@@ -259,7 +260,7 @@ Two caveats, so the conclusion is not overstated:
 - The shape-derived band was weakly discriminating (removed only 15/171 trades),
   so the two branches overlap heavily and the contrast had little room to
   separate. This follows from the honest "by shape" rule, not a protocol defect.
-- *Reference only, not pre-registered, does not change the verdict:* the original
+- *Reference only, not pre-specified, and not used for the verdict:* the original
   author's band [0.2, 1.7) gives diff +10.96, CI [−1.11, +23.37] on N = 71 — a
   signal on the edge of significance. A moderate-premium zone *may* carry
   information, but it could not be proven on this data volume. Registered as a
@@ -271,9 +272,9 @@ Two caveats, so the conclusion is not overstated:
 ## Post-validation diagnostics
 
 Beyond the hypothesis tests, the frozen daily configuration was profiled on a
-fixed 10,000 USDT base: Monte Carlo (10,000 bootstrap paths of the OOS trades)
+fixed 10,000 USDT base: Monte Carlo (10,000 bootstrap paths of the held-out trades)
 and a slippage stress over a 5×5×7 grid stressing entry, time-exit and stop
-fills separately. The edge survives the entire realistic slippage zone for
+fills separately. Expectancy remains positive across the realistic slippage zone for
 post-pump alts (entry/exit 0.1–0.2 %, stop 0.3–0.75 %); the only failing grid
 point is all three components at their extremes simultaneously. Full numbers,
 equity curves and distribution charts: **[REPORT.md](REPORT.md)**.
@@ -317,15 +318,16 @@ equity curves and distribution charts: **[REPORT.md](REPORT.md)**.
 
 Known weaknesses, stated up front rather than discovered by a reviewer:
 
-- **Reversed IS/OOS chronology.** IS = 2026 (recent), OOS = 2025 (earlier).
-  This is a valid held-out test, but it is not a walk-forward: forward
+- **Historical holdout precedes calibration.** Calibration = 2026 (recent),
+  holdout = 2025 (earlier). This is a valid held-out historical test, but it is
+  not a walk-forward test: forward
   degradation from the calibration regime is untested. Chosen deliberately to
   calibrate on the regime closest to live deployment; a true forward test
   begins with 2026-H2 data.
 - **No formal multiple-testing correction.** 1,600 grid configurations are
   mitigated by CI-lower-bound selection, a plateau requirement and a single
-  pre-registered OOS run — but no White's Reality Check / deflated-Sharpe
-  style correction was applied.
+  pre-specified held-out evaluation — but no White's Reality Check /
+  deflated-Sharpe style correction was applied.
 - **Bootstrap assumes i.i.d. trades.** Up to 7 positions overlap in time and
   signals cluster by day, so the confidence intervals are somewhat
   optimistic. A day-cluster bootstrap was used only in the exploratory
@@ -336,9 +338,9 @@ Known weaknesses, stated up front rather than discovered by a reviewer:
   (margin call is unreachable at ≤ 0.7x leverage).
 - **Capacity is not modeled.** Flat 1,000 USDT sizing; the slippage stress
   only roughly approximates larger sizes on illiquid post-pump books.
-- **2025 was reused** after the H1 OOS run for diagnostics (Monte Carlo,
+- **2025 was reused** after the H1 held-out evaluation for diagnostics (Monte Carlo,
   slippage stress, exploratory decomposition). Diagnostics do not change the
-  verdicts, but any *configuration* change now requires a fresh OOS period.
+  verdicts, but any *configuration* change now requires a fresh forward sample.
 - **`volume_points ≥ 40` sits on the grid edge**; the region beyond was never
   probed.
 
@@ -348,11 +350,12 @@ Known weaknesses, stated up front rather than discovered by a reviewer:
 
 | Hypothesis | Claim | Verdict |
 |---|---|---|
-| **H1** (daily) | Qualifying Upbit pumps revert profitably, net of costs, OOS | **Confirmed** — OOS expectancy +16.42, CI [+5.20, +27.77] |
-| **H1** (night) | Same, for the post-midnight regime | **Rejected** — OOS CI crosses zero |
-| **H2** | The edge is Korea-specific (kimchi premium carries information) | **Rejected** — kimchi gate gives no distinguishable improvement |
+| **H1** (daily) | Qualifying Upbit pumps revert profitably, net of costs | **Supported on the historical holdout** — expectancy +16.42, CI [+5.20, +27.77] |
+| **H1** (night) | Same, for the post-midnight regime | **Not supported** — held-out CI crosses zero |
+| **H2** | The edge is Korea-specific (kimchi premium carries information) | **Not supported** — kimchi gate gives no distinguishable improvement |
 
-The strategy captures a real, cost-surviving, out-of-sample edge in shorting
-post-pump altcoins — but the "Korean premium" framing is **not** what drives it.
-The mechanism is generic post-pump mean reversion, signalled by Upbit pump
-activity, with Binance as the execution venue.
+The daily configuration retained positive net expectancy in the historical
+holdout, while the "Korean premium" explanation was not supported. The evidence
+is more consistent with generic post-pump mean reversion signalled by Upbit
+activity, with Binance as the execution venue. Forward validation on data
+collected after calibration is still required.
